@@ -2,31 +2,63 @@ package LessonAPI;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
-import io.restassured.RestAssured;
+import io.restassured.builder.RequestSpecBuilder;
+import io.restassured.builder.ResponseSpecBuilder;
+import io.restassured.filter.log.LogDetail;
 import io.restassured.http.ContentType;
 import io.restassured.http.Header;
+import io.restassured.specification.RequestSpecification;
+import io.restassured.specification.ResponseSpecification;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-//import patterns.builder.User;
 
 import static io.restassured.RestAssured.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 
 class ImgurApiTest extends BaseApiTest {
 
+    public static String commentId;
     private String currentDeleteHash;
+    private String currentImageHash;
+
+   // PojoImgur pojoImgur = new PojoImgur();
+
 
     public ImgurApiTest() throws IOException {
     }
+    RequestSpecification requestSpecification =
+             new RequestSpecBuilder()
+                     .setBaseUri(getBaseUri())
+                     .setAccept(ContentType.JSON)
+                     .setContentType(ContentType.ANY)
+                     .setAuth(oauth2(getToken()))
+                   //.addHeader("Authorization", getToken())
+                    // .log(LogDetail.ALL)
+                    .build();
+
+    ResponseSpecification responseSpecification =
+            new ResponseSpecBuilder()
+                    .expectStatusCode(200)
+                    .expectStatusLine("HTTP/1.1 200 OK")
+                    .expectContentType(ContentType.JSON)
+                    .expectResponseTime(Matchers.lessThan(5000L))
+                    //.expectHeader("Access-Control-Allow-Credentials", "true")
+                    .expectBody("success", is(true))
+                    .log(LogDetail.ALL)
+                    .build();
+
 
     @BeforeEach
     void setUp() {
-        RestAssured.baseURI = getBaseUri();
+      //  RestAssured.baseURI = getBaseUri();
     }
-
 
     @AfterEach
     void tearDown() {
@@ -38,72 +70,95 @@ class ImgurApiTest extends BaseApiTest {
     void testGetAccountBase() {
 
         given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .auth()
-                .oauth2(getToken())
+                .spec(requestSpecification)
                 .expect()
                 .body("data.url", is("alalala12345"))
-                .log()
-                .all()
-                .statusCode(200)
+                .body("data.find{it.id=='153629973'}.url", equalTo("alalala12345"))
                 .when()
-                .get("3/account/{username}", getUserName());
-    }
+                .get("3/account/{username}", getUserName())
+                .then()
+                .spec(responseSpecification)
+                .extract().jsonPath().getList("data",PojoImgur.class);
 
-    @Test
-    @DisplayName("Проверка статуса Блока Аккаунта")
-    void testAccountBlock(){
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .auth()
-                .oauth2(getToken())
-                .expect()
-                .body("success", is(true))
-                .log()
-                .all()
-                .statusCode(200)
-                .when()
-                .get("3/account/me/block");
 
     }
+//    @Test
+//    @DisplayName("Получение информации об аккаунте")
+//    void testGetAccountBase() {
+//
+//        given()
+//                // .spec(requestSpecification)
+//                .contentType(ContentType.JSON)
+//                .accept(ContentType.JSON)
+//                .auth()
+//                .oauth2(getToken())
+//                .expect()
+//                .body("data.url", is("alalala12345"))
+//                .log()
+//                .all()
+//                //.statusCode(200)
+//                .when()
+//                .get("3/account/{username}", getUserName())
+//                .then()
+//                .statusCode(200);
+//        // .spec(responseSpecification);
 
-    @Test
-    @DisplayName("Проверка Коментов")
-    void testComments(){
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .auth()
-                .oauth2(getToken())
-                .expect()
-               //.body("data[0].id", is(2124213461),"data.comment[0]", is("I'm a giraffe!"))
-                .log()
-                .all()
-                .statusCode(200)
-                .when()
-                .get("3/account/{username}/comments/",getUserName());
+
+
+//    @Test
+//    @DisplayName("Проверка статуса Блока Аккаунта")
+//    void testAccountBlock(){
+//        given()
+////                .contentType(ContentType.JSON)
+////                .accept(ContentType.JSON)
+//                .auth()
+//                .oauth2(getToken())
+//                .expect()
+//                .body("success", is(true))
+//                .log()
+//                .all()
+//                .when()
+//                .get("3/account/me/block")
+//                .then()
+//                .spec(responseSpecification);
+//
+//    }
+//
+@Test
+@DisplayName("Проверка Коментов")
+void testComments() {
+    List<PojoImgur> comments =
+            given()
+                    .spec(requestSpecification)
+                    .expect()
+                    .body("data.find{it.image_id=='Y9H3txa'}.author", equalTo("alalala12345"))
+                    .when()
+                    .get("3/account/{username}/comments/", getUserName())
+                    .then()
+                    .spec(responseSpecification)
+                    //.extract().jsonPath().getList("data.email")
+                    .extract().jsonPath().getList("data", PojoImgur.class);
+
+   assertThat(comments).extracting(PojoImgur::getId).contains(2124213461);
+
     }
 
     @Test
     @DisplayName("Пост Коммента")
     void testPostComment(){
-        given()
-                .auth()
-                .oauth2(getToken())
-                .when()
+       commentId=given()
+               .spec(requestSpecification)
                 .header("content-type", "multipart/form-data")
                 .multiPart("image_id", "Y9H3txa")
                 .multiPart("comment", "ABUabuABuabu")
-                .expect()
-                //.body("success", is(true))
-                .log()
-                .all()
-                .statusCode(200)
+                .multiPart("parent_id", "{commentId}")
                 .when()
-                .post("3/comment");
+                .post("3/comment")
+               .then()
+               .spec(responseSpecification)
+               .extract().jsonPath().getString("data.id");
 
+       System.out.println(commentId);
 
     }
 
@@ -111,37 +166,24 @@ class ImgurApiTest extends BaseApiTest {
     @DisplayName("Проверка Post Коментов")
     void testPostedComments() {
         given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .auth()
-                .oauth2(getToken())
+                .spec(requestSpecification)
                 .expect()
                 .body("data[0].id", is(notNullValue()), "data.comment[0]", is("ABUabuABuabu"))
-                .log()
-                .all()
-                .statusCode(200)
                 .when()
-                .get("3/account/{username}/comments/", getUserName());
+                .get("3/account/{username}/comments/", getUserName())
+                .then()
+                .spec(responseSpecification);
     }
 
-               Integer commentId = 2127053077;
     @Test
     @DisplayName("Delete comment")
     void testDeleteComment(){
         given()
-                .auth()
-                .oauth2(getToken())
+                .spec(requestSpecification)
                 .when()
-//                .header("content-type", "multipart/form-data")
-//                .multiPart("image_id", "Y9H3txa")
-//                .multiPart("comment", "ABUabuABuabu")
-                .expect()
-                //.body("success", is(true))
-                .log()
-                .all()
-                .statusCode(200)
-                .when()
-                .delete("3/comment/{commentId}", 2127042129);
+                .delete("3/comment/{commentId}",2128045905)
+                .then()
+                .spec(responseSpecification);
 
     }
 
@@ -149,17 +191,13 @@ class ImgurApiTest extends BaseApiTest {
     @DisplayName("Проверка Delete Коментов")
     void testAfterDeletedComments() {
         given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .auth()
-                .oauth2(getToken())
+                .spec(requestSpecification)
                 .expect()
-                .body("data[0].id", is(notNullValue()), "data.comment[0]", is(not("ABUabuABuabu")))
-                .log()
-                .all()
-                .statusCode(200)
+                .body("data[0].id", is(not(2128032297)), "data.comment[0]", is(not("ABUabuABuabu")))
                 .when()
-                .get("3/account/{username}/comments/", getUserName());
+                .get("3/account/{username}/comments/", getUserName())
+                .then()
+                .spec(responseSpecification);
     }
 
 
@@ -170,55 +208,65 @@ class ImgurApiTest extends BaseApiTest {
     void testImageUpload() throws Exception {
 
         currentDeleteHash = given()
-                .auth()
-                .oauth2(getToken())
-                .when()
+                .spec(requestSpecification)
                 .header(new Header("content-type", "multipart/form-data"))
                 .multiPart("image", new File( "./src/test/resources/res.jpg"))
                 .expect()
-                .statusCode(200)
                 .body("data.id", is(notNullValue()))
                 .body("data.deletehash", is(notNullValue()))
-                .log()
-                .all()
                 .when()
                 .post("3/upload")
-                .jsonPath()
-                .getString("data.deletehash");
-        System.out.println(currentDeleteHash);
+                .then()
+                .spec(responseSpecification)
+                .extract().jsonPath().getString("data.deletehash");
     }
 
     @Test
     @DisplayName("Проверка get image")
     void testGetImage() {
         given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .auth()
-                .oauth2(getToken())
-                .expect()
-                .log()
-                .all()
-                .statusCode(200)
+                .spec(requestSpecification)
                 .when()
-                .get("3/image/{imageHash}", "l6VfMPTbK462rtS");
+                .get("3/image/{imageHash}", "ZW1Y2Tn") //imageId
+                .then()
+                .spec(responseSpecification);
     }
 
     @Test
     @DisplayName("Test Delete Image")
     void testDeleteImage(){
         given()
-                .auth()
-                .oauth2(getToken())
+                .spec(requestSpecification)
                 .when()
-                .expect()
-                //.body("success", is(true))
-                .log()
-                .all()
-                .statusCode(200)
-                .when()
-                .delete("3/image/{imageDeleteHash}", "RzaWGAy1nGLKRtL"); //currentDeleteHash
+                .delete("3/image/{imageDeleteHash}", "GOLmAlBwmsXzqgr") //currentDeleteHash
+                .then()
+                .spec(responseSpecification);
 
+    }
+    @Test
+    @DisplayName("Test Delete Image")
+    void testDeleteImage2(){
+        given()
+                .spec(requestSpecification)
+                .when()
+                .delete("3/image/{imageHash}", "GOLmAlBwmsXzqgr")  //currentDeleteHash
+                .then()
+                .spec(responseSpecification);
+
+    }
+
+    @Test
+    @DisplayName("Проверка get image")
+    void testGetDeletedImage() {
+        given()
+               .spec(requestSpecification)
+                .expect()
+                .statusCode(404)
+                .body("data.imageHash[0]", is(not("ZW1Y2Tn")))
+                .when()
+                .get("3/image/{imageHash}", "ZW1Y2Tn");
+                //.then()
+                //.spec(responseSpecification);
     }
 
 

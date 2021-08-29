@@ -8,12 +8,17 @@ abstract class BaseApiTest {
     private final String baseUri;
     private final String userName;
     private final PropertyScanner scanner;
+    private String currentCommentId;
 
     public BaseApiTest() throws IOException {
         scanner = new PropertyScanner();
         token = scanner.getProperty("imgur.auth.token");
         baseUri = scanner.getProperty("imgur.api.url");
         userName = scanner.getProperty("imgur.username");
+        currentCommentId = ImgurApiTest.commentId;
+    }
+    public String getCurrentCommentId(){
+        return currentCommentId;
     }
 
     public String getToken() {
