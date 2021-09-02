@@ -3,7 +3,7 @@ package LessonAPI;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
-//@Data
+@Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PojoImgur {
     private int id;
